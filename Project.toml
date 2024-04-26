@@ -1,6 +1,8 @@
 [deps]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 CellMLToolkit = "03cb29e0-1ef4-4721-aa24-cf58a006576f"
+DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
 DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DynamicalSystems = "61744808-ddfa-5f27-97ff-6e42cc95d634"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
