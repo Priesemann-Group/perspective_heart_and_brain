@@ -1,5 +1,6 @@
 # VS Code settings
 .vscode/
+config_user.json
 
 # pdf figures should not be part of the repository unless forced
 figures/
