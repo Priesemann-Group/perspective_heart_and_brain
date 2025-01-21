@@ -12,45 +12,55 @@ import diffrax
 import lineax
 
 class FHN_model:
-    def __init__(self, 
-                N=200, 
-                a=3, 
-                b=None, 
-                e=0.01, 
-                noise_amp=None, 
+    def __init__(self,
+                organ='brain',
+                N='organ_default', 
+                a='organ_default', 
+                b='organ_default', 
+                e='organ_default', 
+                noise_amp='organ_default', 
+                Du='organ_default', 
                 v0='zeros', 
-                w0='zeros', 
-                L=None, 
-                m=0.005,
+                w0='zeros',
+                m='organ_default',
+                p='organ_default',
+                Du='organ_default',
+                k='organ_default',
                 random_key=jr.PRNGKey(1000), 
                 v0_noise_amp=None, 
                 w0_noise_amp=None,
-                organ='brain',
-                p=0,
-                Du=None,
-                k=50,
                 Laplacian_seed=1000,
                 stimulus_time=1000):
-        # Model Parameters
-        self.N = N
-        self.a = a
-        self.e = e
-        self.L = L
-        self.organ=organ
-        self.p=p
-        self.Laplacian_seed=Laplacian_seed
-        self.stimulus_time=stimulus_time
-        self.k=k
-        self.m=m
-
+        ## Organ-specific initialization
         # TODO atm here I pass only the parameters we use in the simulations. For educational purposes we should change it
         if type(organ)==str and organ == 'brain':
-            Du = 1
-            noise_amp = 0.1
-            b=0.2
-            self.block= None
-            self.initiate_random_graph()
-            # Solution objects
+            if type(N)==str and N == 'organ_default':
+                N = 1000
+            if type(a)==str and a == 'organ_default':
+                a = 3
+            if type(b)==str and b == 'organ_default':
+                b = 0.2
+            if type(e)==str and e == 'organ_default':
+                e = 0.01
+            if type(noise_amp)==str and noise_amp == 'organ_default':
+                noise_amp = 0.1
+            if type(Du)==str and Du == 'organ_default':
+                Du = 1
+            elif Du != 1:
+                print('A Du value other than 1 is not allowed for a brain simulation as the parameter is absorbed in m. Du will be set to 1 instead.')
+                Du = 1
+            if type(m)==str and m == 'organ_default':
+                m = 0.005
+            if type(p)==str and p == 'organ_default':
+                p = 0    # has no influence
+            if type(k)==str and k == 'organ_default':
+                k = 50   # has no influence
+
+            # Initiate the coupling matrix
+            self.initiate_random_graph(seed=Laplacian_seed)
+            self.block = None # Blocked, fibrotic cells only exist in heart simulations
+
+            # Initial conditions
             if type(v0) == str and v0=='zeros':
                 v0 = jnp.zeros(N)
             if type(w0) == str and w0=='zeros':
@@ -60,11 +70,31 @@ class FHN_model:
                 v0 = jax.random.normal(random_key, shape=(2*N,))*v0_noise_amp
             if type(w0) == str and w0=='random':
                 v0 = jax.random.normal(random_key, shape=(2*N,))*w0_noise_amp
+        
         elif type(organ)==str and organ == 'heart':
-            Du = -0.04
-            noise_amp = 0.0001
-            b=0.05
-            self.generate_laplacian()
+            if type(N)==str and N == 'organ_default':
+                N = 200
+            if type(a)==str and a == 'organ_default':
+                a = 3
+            if type(b)==str and b == 'organ_default':
+                b = 0.05
+            if type(e)==str and e == 'organ_default':
+                e = 0.01
+            if type(noise_amp)==str and noise_amp == 'organ_default':
+                noise_amp = 0.0001
+            if type(Du)==str and Du == 'organ_default':
+                Du = -0.04
+            if type(m)==str and m == 'organ_default':
+                m = 0.005  # has no influence
+            if type(p)==str and p == 'organ_default':
+                p = 0
+            if type(k)==str and k == 'organ_default':
+                k = 8      # has no influence
+
+            # Initiate the coupling matrix
+            self.generate_laplacian(seed=Laplacian_seed)
+
+            # Initial conditions
             indices = jnp.where((jnp.arange(N*N) % N == 0) & (self.block.flatten() == 0))[0]
             y0 = jnp.zeros(2 * N*N, dtype=jnp.float32)
             y0 = y0.at[indices].set(0.1)
@@ -72,15 +102,29 @@ class FHN_model:
             w0=y0[N*N:]
         else:
             raise ValueError('Organ must be either brain or heart')
-
-
-        self.Du = Du
+        
+        ## Organ-agnostic initialization
+        # Model parameters
+        self.organ=organ
+        self.Laplacian_seed=Laplacian_seed
+        self.stimulus_time=stimulus_time
+        
+        self.N = N
+        self.a = a
+        self.b = b
+        self.e = e
         self.noise_amp = noise_amp
-        self.b=b
+        self.Du=Du
+        self.m=m
+        self.p=p
+        self.k=k
 
 
+        # Initial conditions
         self.v0 = v0
         self.w0 = w0
+        
+        # Solution obects
         self.ts = None
         self.vs = None
         self.ws = None
@@ -90,7 +134,7 @@ class FHN_model:
         return (v_array, self.a*v_array*(v_array-self.b)*(1-v_array))  # return the corresponding w_arrays
     
     #random network implementation TODO: implement how to pass gaussian weights
-    def initiate_random_graph(self,  seed=100, weights='homogeneous', weight_generator=None):
+    def initiate_random_graph(self,  seed=100):
         '''
         Creates a random, directed, and weighted Erdos Renyi graph.
         Parameters:
@@ -110,10 +154,7 @@ class FHN_model:
         
         # Put weights
         for u, v in G.edges():
-            if weights=='homogeneous':
-                G[u][v]['weight'] = J#generator.normal(J, J/5)
-            elif weights=='gaussian':
-                G[u][v]['weight'] = weight_generator.normal(J[0], J[1])
+            G[u][v]['weight'] = J
         
         # Get the adjacency matrix in sparse format
         adj_matrix = nx.adjacency_matrix(G, weight='weight')
@@ -121,7 +162,7 @@ class FHN_model:
         self.L = sparse.BCSR.from_scipy_sparse(adj_matrix)
     
     #Laplacian generation for the heart
-    def generate_laplacian(self, sparse_matrix=True):
+    def generate_laplacian(self, sparse_matrix=True, seed=101):
         #TODO: implement fully in jax
         num_nodes = self.N * self.N
         adj_rows = []
@@ -129,7 +170,7 @@ class FHN_model:
         adj_data = []
 
         # Generate random conduction blocks
-        np.random.seed(self.Laplacian_seed)
+        np.random.seed(seed)
         conduction_blocks = np.random.rand(self.N, self.N) < self.p
 
         # Function to map grid (i, j) to a single node index
@@ -267,66 +308,66 @@ class FHN_model:
     
     
     
-    def solve_with_EulerMaruyama(self, delta_t=0.1, T=3000.0, output_times=3000, random_key=jr.PRNGKey(0)): 
+    # def solve_with_EulerMaruyama(self, delta_t=0.1, T=3000.0, output_times=3000, random_key=jr.PRNGKey(0)): 
     
 
-        # Calculate the number of solver steps based on the total time and delta_t
-        num_steps = int(T / delta_t)
+    #     # Calculate the number of solver steps based on the total time and delta_t
+    #     num_steps = int(T / delta_t)
 
-        # Initialize state variables
-        v = self.v0
-        w = self.w0
-        if self.organ=='brain':
-            # Define the scan function
-            def scan_fn(carry, step):
-                v, w, key = carry
-                key, subkey = jr.split(key)
+    #     # Initialize state variables
+    #     v = self.v0
+    #     w = self.w0
+    #     if self.organ=='brain':
+    #         # Define the scan function
+    #         def scan_fn(carry, step):
+    #             v, w, key = carry
+    #             key, subkey = jr.split(key)
 
-                # Update variables
-                deterministic_update = self.FHN_graph(v, w)
-                noise_update = jr.normal(subkey, v.shape) * self.noise_amp
-                v = v + deterministic_update[0]*delta_t +  jnp.sqrt(delta_t) * noise_update
-                w = w + deterministic_update[1]*delta_t
-                return (v, w, key), (v, w)
+    #             # Update variables
+    #             deterministic_update = self.FHN_graph(v, w)
+    #             noise_update = jr.normal(subkey, v.shape) * self.noise_amp
+    #             v = v + deterministic_update[0]*delta_t +  jnp.sqrt(delta_t) * noise_update
+    #             w = w + deterministic_update[1]*delta_t
+    #             return (v, w, key), (v, w)
 
-            # Run the scan function
-            (v, w, _), (v_trajectory, w_trajectory) = jax.lax.scan(scan_fn, (v, w, random_key), None, length=num_steps)
+    #         # Run the scan function
+    #         (v, w, _), (v_trajectory, w_trajectory) = jax.lax.scan(scan_fn, (v, w, random_key), None, length=num_steps)
 
-        if self.organ=='heart':
-                Ntot=self.N*self.N
-                indices = jnp.where((jnp.arange(Ntot) % self.N== 0) & (self.block.flatten() == 0))[0]
+    #     if self.organ=='heart':
+    #             Ntot=self.N*self.N
+    #             indices = jnp.where((jnp.arange(Ntot) % self.N== 0) & (self.block.flatten() == 0))[0]
                 
-                def scan_fn(carry, step):
-                    v, w, key= carry
-                    key, subkey = jr.split(key)
+    #             def scan_fn(carry, step):
+    #                 v, w, key= carry
+    #                 key, subkey = jr.split(key)
                     
                     
                     
-                     # Apply stimulus to the specified indices
-                    v = jax.lax.cond((step > 0) & (step % int(self.stimulus_time / delta_t) == 0),
-                                      lambda v: v.at[indices].add(0.1),
-                                      lambda v: v,
-                                      v)
-                    deterministic_update = self.FHN_graph(v, w)
-                    noise_update = jr.normal(subkey, v.shape) * self.noise_amp
-                    v = v + deterministic_update[0]*delta_t +  jnp.sqrt(delta_t) * noise_update
-                    w = w + deterministic_update[1]*delta_t
+    #                  # Apply stimulus to the specified indices
+    #                 v = jax.lax.cond((step > 0) & (step % int(self.stimulus_time / delta_t) == 0),
+    #                                   lambda v: v.at[indices].add(0.1),
+    #                                   lambda v: v,
+    #                                   v)
+    #                 deterministic_update = self.FHN_graph(v, w)
+    #                 noise_update = jr.normal(subkey, v.shape) * self.noise_amp
+    #                 v = v + deterministic_update[0]*delta_t +  jnp.sqrt(delta_t) * noise_update
+    #                 w = w + deterministic_update[1]*delta_t
     
     
-                    return (v, w, key), (v, w)
-                # Create a range of steps
-                steps = jnp.arange(num_steps)
+    #                 return (v, w, key), (v, w)
+    #             # Create a range of steps
+    #             steps = jnp.arange(num_steps)
     
-                # Run the scan function
-                carry = (v, w, random_key)
-                (v, w, _), (v_trajectory, w_trajectory) = jax.lax.scan(scan_fn, carry, steps)
+    #             # Run the scan function
+    #             carry = (v, w, random_key)
+    #             (v, w, _), (v_trajectory, w_trajectory) = jax.lax.scan(scan_fn, carry, steps)
 
-        self.ts = jnp.linspace(0, T, output_times)
-        output_every = int(max(num_steps/output_times,1))
-        self.vs = v_trajectory[::output_every]
-        self.ws = w_trajectory=w_trajectory[::output_every]
+    #     self.ts = jnp.linspace(0, T, output_times)
+    #     output_every = int(max(num_steps/output_times,1))
+    #     self.vs = v_trajectory[::output_every]
+    #     self.ws = w_trajectory=w_trajectory[::output_every]
                 
-        return None
+    #     return None
     
     def solve_with_EulerMaruyama_fori(self, delta_t=0.1, T=3000.0, output_times=3000, random_key=jr.PRNGKey(0)): 
               
@@ -371,7 +412,7 @@ class FHN_model:
                         lambda v: v.at[indices].add(0.1),
                         lambda v: v,
                         v)
-                deterministic_update = self.FHN_graph(v, w)
+                deterministic_update = self.FHN_graph(v, w, v_delayed)
                 noise_update = jr.normal(subkey, v.shape) * self.noise_amp
                 v = v + deterministic_update[0] * delta_t + jnp.sqrt(delta_t) * noise_update
                 w = w + deterministic_update[1] * delta_t
@@ -389,8 +430,8 @@ class FHN_model:
 
         return None
     
-    def EEG(self, random_sample=False):
-        if random_sample:
-            return self.vs[:, jr.randint(0,self.N,size=random_sample)].sum(axis=1).flatten()
-        else:
-            return self.vs.sum(axis=1).flatten()
+    # def EEG(self, random_sample=False):
+    #     if random_sample:
+    #         return self.vs[:, jr.randint(0,self.N,size=random_sample)].sum(axis=1).flatten()
+    #     else:
+    #         return self.vs.sum(axis=1).flatten()
