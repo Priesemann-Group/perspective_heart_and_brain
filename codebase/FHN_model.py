@@ -24,14 +24,13 @@ class FHN_model:
                 w0='zeros',
                 m='organ_default',
                 p='organ_default',
-                Du='organ_default',
                 k='organ_default',
                 random_key=jr.PRNGKey(1000), 
                 v0_noise_amp=None, 
                 w0_noise_amp=None,
                 Laplacian_seed=1000,
                 stimulus_time=1000):
-        ## Organ-specific initialization
+        ## Model parameters
         # TODO atm here I pass only the parameters we use in the simulations. For educational purposes we should change it
         if type(organ)==str and organ == 'brain':
             if type(N)==str and N == 'organ_default':
@@ -56,21 +55,6 @@ class FHN_model:
             if type(k)==str and k == 'organ_default':
                 k = 50   # has no influence
 
-            # Initiate the coupling matrix
-            self.initiate_random_graph(seed=Laplacian_seed)
-            self.block = None # Blocked, fibrotic cells only exist in heart simulations
-
-            # Initial conditions
-            if type(v0) == str and v0=='zeros':
-                v0 = jnp.zeros(N)
-            if type(w0) == str and w0=='zeros':
-                w0 = jnp.zeros(N)
-        
-            if type(v0) == str and v0=='random':
-                v0 = jax.random.normal(random_key, shape=(2*N,))*v0_noise_amp
-            if type(w0) == str and w0=='random':
-                v0 = jax.random.normal(random_key, shape=(2*N,))*w0_noise_amp
-        
         elif type(organ)==str and organ == 'heart':
             if type(N)==str and N == 'organ_default':
                 N = 200
@@ -90,25 +74,14 @@ class FHN_model:
                 p = 0
             if type(k)==str and k == 'organ_default':
                 k = 8      # has no influence
-
-            # Initiate the coupling matrix
-            self.generate_laplacian(seed=Laplacian_seed)
-
-            # Initial conditions
-            indices = jnp.where((jnp.arange(N*N) % N == 0) & (self.block.flatten() == 0))[0]
-            y0 = jnp.zeros(2 * N*N, dtype=jnp.float32)
-            y0 = y0.at[indices].set(0.1)
-            v0=y0[:N*N]
-            w0=y0[N*N:]
         else:
             raise ValueError('Organ must be either brain or heart')
-        
-        ## Organ-agnostic initialization
-        # Model parameters
+
+        # Save model parameters
         self.organ=organ
         self.Laplacian_seed=Laplacian_seed
         self.stimulus_time=stimulus_time
-        
+
         self.N = N
         self.a = a
         self.b = b
@@ -119,12 +92,39 @@ class FHN_model:
         self.p=p
         self.k=k
 
+        ## Initiate the coupling matrix and initial conditions
+        if type(organ)==str and organ == 'brain':
+            # Coupling matrix
+            self.initiate_random_graph(seed=Laplacian_seed)
+            self.block = None # Blocked, fibrotic cells only exist in heart simulations
 
-        # Initial conditions
+            # Initial conditions
+            if type(v0) == str and v0=='zeros':
+                v0 = jnp.zeros(N)
+            if type(w0) == str and w0=='zeros':
+                w0 = jnp.zeros(N)
+        
+            if type(v0) == str and v0=='random':
+                v0 = jax.random.normal(random_key, shape=(2*N,))*v0_noise_amp
+            if type(w0) == str and w0=='random':
+                v0 = jax.random.normal(random_key, shape=(2*N,))*w0_noise_amp
+        
+        elif type(organ)==str and organ == 'heart':
+            # Coupling matrix
+            self.generate_laplacian(seed=Laplacian_seed)
+
+            # Initial conditions
+            indices = jnp.where((jnp.arange(N*N) % N == 0) & (self.block.flatten() == 0))[0]
+            y0 = jnp.zeros(2 * N*N, dtype=jnp.float32)
+            y0 = y0.at[indices].set(0.1)
+            v0=y0[:N*N]
+            w0=y0[N*N:]
+        
+        # Save initial conditions
         self.v0 = v0
         self.w0 = w0
         
-        # Solution obects
+        # Initialize solution obects
         self.ts = None
         self.vs = None
         self.ws = None
@@ -374,55 +374,46 @@ class FHN_model:
         # Calculate the number of solver steps based on the total time and delta_t
         num_steps = int(T / delta_t)
         output_every = int(max(num_steps/output_times,1))
-        if self.organ=='brain':
-            # Initialize output arrays
-            vs = jnp.zeros((output_times, self.N))
-            ws = jnp.zeros((output_times, self.N))
-
-            # Define the scan function
-            def scan_fn(step, carry):
-                v, w, key, vs, ws = carry
-                key, subkey = jr.split(key)
-
-                # Update variables
-                deterministic_update = self.FHN_graph(v, w)
-                noise_update = jr.normal(subkey, v.shape) * self.noise_amp
-                v = v + deterministic_update[0]*delta_t +  jnp.sqrt(delta_t) * noise_update
-                w = w + deterministic_update[1]*delta_t
-
-                vs = vs.at[step//output_every,:].set(v)
-                ws = ws.at[step//output_every,:].set(w)
-                return (v, w, key, vs, ws)
-
-            # Run the scan function
-            _, _, _, vs, ws = jax.lax.fori_loop(0, num_steps, scan_fn, (self.v0, self.w0, random_key, vs, ws))
-        if self.organ == 'heart':
-            Ntot = self.N * self.N
+        
+        Ntot = self.N
+        
+        # Heart-specific preparations 
+        if self.organ=='heart':
+            # meaning of N changes
+            Ntot = self.N*self.N
+            # note indices fibrotic conduction blocks, needed for stimulus
             indices = jnp.where((jnp.arange(Ntot) % self.N == 0) & (self.block.flatten() == 0))[0]
-            
-            # Initialize output arrays
-            vs = jnp.zeros((output_times, Ntot))
-            ws = jnp.zeros((output_times, Ntot))
-            # Define the scan function
-            def scan_fn(step, carry):
-                v, w, key, vs, ws = carry
-                key, subkey = jr.split(key)
+                
+        # Initialize output arrays
+        vs = jnp.zeros((output_times, Ntot))
+        ws = jnp.zeros((output_times, Ntot))
+
+        # Define the scan function
+        def scan_fn(step, carry):
+            v, w, key, vs, ws = carry
+            key, subkey = jr.split(key)
+
+            # Update variables
+            deterministic_update = self.FHN_graph(v, w)
+            noise_update = jr.normal(subkey, v.shape) * self.noise_amp
+            v = v + deterministic_update[0]*delta_t +  jnp.sqrt(delta_t) * noise_update
+            w = w + deterministic_update[1]*delta_t
+
+            # Heart-specific: periodic stimulus from SA nodes
+            if self.organ=='heart':
                 # Apply stimulus to the specified indices
                 v = jax.lax.cond((step > 0) & (step % int(self.stimulus_time / delta_t) == 0),
                         lambda v: v.at[indices].add(0.1),
                         lambda v: v,
                         v)
-                deterministic_update = self.FHN_graph(v, w, v_delayed)
-                noise_update = jr.normal(subkey, v.shape) * self.noise_amp
-                v = v + deterministic_update[0] * delta_t + jnp.sqrt(delta_t) * noise_update
-                w = w + deterministic_update[1] * delta_t
-                vs = vs.at[step // output_every, :].set(v)
-                ws = ws.at[step // output_every, :].set(w)
-                return (v, w, key, vs, ws)
-                # Run the scan function
-            _, _, _, vs, ws = jax.lax.fori_loop(0, num_steps, scan_fn, (self.v0, self.w0, random_key, vs, ws))
+            
+            vs = vs.at[step//output_every,:].set(v)
+            ws = ws.at[step//output_every,:].set(w)
+            return (v, w, key, vs, ws)
 
-
+        # Run the scan function
+        _, _, _, vs, ws = jax.lax.fori_loop(0, num_steps, scan_fn, (self.v0, self.w0, random_key, vs, ws))
+        
         # Make sure only at most output_times many time points are stored
         self.ts = jnp.linspace(0, T, output_times)
         self.vs = vs
