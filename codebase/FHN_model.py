@@ -8,9 +8,6 @@ import jax.random as jr
 from jax.experimental import sparse
 from jax import lax, vmap
 
-import diffrax
-import lineax
-
 class FHN_model:
     def __init__(self,
                 organ='brain',
@@ -240,136 +237,11 @@ class FHN_model:
 
         return (dv,dw)
     
-    # def FHN_graph(v, w, params):
-    #     a, b, e, L, _, _ = params
-    #     dv = a*v*(v-b)*(1-v) + L@v - w 
-    #     dw = e*(v-w)
-
-    #     return (dv,dw)
-
     # Stochastic part of the differential equation
     def FHN_graph_noise(self):
         noise = self.noise_amp*jnp.ones(self.N)
         return noise
-    # def FHN_graph_noise(params):
-    #     _, _, _, _, noise_amp, N = params
-    #     noise = noise_amp*jnp.ones(N)
-    #     return noise
-      
-    
-    # def solve_with_diffrax(self, T=1000, max_steps=1000000, output_times=1000, solver=diffrax.ShARK(),rtol=1e-2, atol=1e-4,dt0=1e-2, noise_tol=1e-4, pcoeff=0.1, icoeff=0.0, dcoeff=0, random_key=jr.PRNGKey(0)):
-    #     '''
-    #     Takes in all simulation and solver parameters and returns a solution of the coupled SDEs
-
-    #     -- CURRENTLY NOT WORKING ---
-
-    #     Parameters:
-    #         TODO
-            
-    #     Returns:
-    #         diffrax.Solution object
-    #     '''
-
-    #     # Wrapper function that translate the diff eq functions to the format diffrax expects
-    #     def FHN_graph_wrapper(t, y, params):
-    #         _, _, _, _, _, N = params
-    #         v = y[:N]
-    #         w = y[N:]
-    #         return FHN_model.FHN_graph(v, w, params)
-        
-    #     def FHN_graph_noise(t, y, params):
-    #         return lineax.DiagonalLinearOperator(FHN_model.FHN_graph_noise(params))
-        
-    #     # Set up the stochastic diff eq
-    #     deterministic_term = diffrax.ODETerm(FHN_graph_wrapper)
-    #     brownian_path = diffrax.VirtualBrownianTree(0., T, tol=noise_tol, shape=(2*self.N,), key=random_key,levy_area=diffrax.SpaceTimeLevyArea)
-    #     noise_term = diffrax.ControlTerm(FHN_graph_noise, brownian_path)
-    #     terms = diffrax.MultiTerm(deterministic_term, noise_term)
-
-    #     # Set up the solver
-    #     saveat = diffrax.SaveAt(ts=jnp.linspace(0, T, output_times))
-    #     stepsize_controller = diffrax.PIDController(rtol=rtol, atol=atol, pcoeff=pcoeff, dcoeff=dcoeff, icoeff=icoeff)
-
-    #     # Solve the diff. eq. 
-    #     sol = diffrax.diffeqsolve(terms, solver, t0=0, t1=T, dt0=dt0, y0=jnp.append(self.v0, self.w0), args=(self.a,self.b,self.e,self.L,self.noise_amp,self.N), saveat=saveat, max_steps=max_steps, progress_meter=diffrax.TqdmProgressMeter(), stepsize_controller=stepsize_controller)
-        
-    #     # Solve results
-    #     self.ts = sol.ts
-    #     self.vs = sol.ys[:,:self.N]
-    #     self.ws = sol.ys[:,self.N:]
-
-    #     # Return solution object in case anything else is needed
-    #     return sol
-    
-    
-    
-    
-
-    
-    
-    
-    # def solve_with_EulerMaruyama(self, delta_t=0.1, T=3000.0, output_times=3000, random_key=jr.PRNGKey(0)): 
-    
-
-    #     # Calculate the number of solver steps based on the total time and delta_t
-    #     num_steps = int(T / delta_t)
-
-    #     # Initialize state variables
-    #     v = self.v0
-    #     w = self.w0
-    #     if self.organ=='brain':
-    #         # Define the scan function
-    #         def scan_fn(carry, step):
-    #             v, w, key = carry
-    #             key, subkey = jr.split(key)
-
-    #             # Update variables
-    #             deterministic_update = self.FHN_graph(v, w)
-    #             noise_update = jr.normal(subkey, v.shape) * self.noise_amp
-    #             v = v + deterministic_update[0]*delta_t +  jnp.sqrt(delta_t) * noise_update
-    #             w = w + deterministic_update[1]*delta_t
-    #             return (v, w, key), (v, w)
-
-    #         # Run the scan function
-    #         (v, w, _), (v_trajectory, w_trajectory) = jax.lax.scan(scan_fn, (v, w, random_key), None, length=num_steps)
-
-    #     if self.organ=='heart':
-    #             Ntot=self.N*self.N
-    #             indices = jnp.where((jnp.arange(Ntot) % self.N== 0) & (self.block.flatten() == 0))[0]
-                
-    #             def scan_fn(carry, step):
-    #                 v, w, key= carry
-    #                 key, subkey = jr.split(key)
-                    
-                    
-                    
-    #                  # Apply stimulus to the specified indices
-    #                 v = jax.lax.cond((step > 0) & (step % int(self.stimulus_time / delta_t) == 0),
-    #                                   lambda v: v.at[indices].add(0.1),
-    #                                   lambda v: v,
-    #                                   v)
-    #                 deterministic_update = self.FHN_graph(v, w)
-    #                 noise_update = jr.normal(subkey, v.shape) * self.noise_amp
-    #                 v = v + deterministic_update[0]*delta_t +  jnp.sqrt(delta_t) * noise_update
-    #                 w = w + deterministic_update[1]*delta_t
-    
-    
-    #                 return (v, w, key), (v, w)
-    #             # Create a range of steps
-    #             steps = jnp.arange(num_steps)
-    
-    #             # Run the scan function
-    #             carry = (v, w, random_key)
-    #             (v, w, _), (v_trajectory, w_trajectory) = jax.lax.scan(scan_fn, carry, steps)
-
-    #     self.ts = jnp.linspace(0, T, output_times)
-    #     output_every = int(max(num_steps/output_times,1))
-    #     self.vs = v_trajectory[::output_every]
-    #     self.ws = w_trajectory=w_trajectory[::output_every]
-                
-    #     return None
-    
-    def solve_with_EulerMaruyama_fori(self, delta_t=0.1, T=3000.0, output_times=3000, random_key=jr.PRNGKey(0)): 
+       def solve_with_EulerMaruyama_fori(self, delta_t=0.1, T=3000.0, output_times=3000, random_key=jr.PRNGKey(0)): 
               
         # Calculate the number of solver steps based on the total time and delta_t
         num_steps = int(T / delta_t)
@@ -420,9 +292,3 @@ class FHN_model:
         self.ws = ws
 
         return None
-    
-    # def EEG(self, random_sample=False):
-    #     if random_sample:
-    #         return self.vs[:, jr.randint(0,self.N,size=random_sample)].sum(axis=1).flatten()
-    #     else:
-    #         return self.vs.sum(axis=1).flatten()
