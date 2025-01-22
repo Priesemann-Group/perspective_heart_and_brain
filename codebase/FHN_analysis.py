@@ -66,7 +66,7 @@ class FHN_kuramoto:
         Function that calculates Kuramoto distinguishing between the two organs TODO : find a smart way to exclude transient/last timesteps and cleaner heart code 
         """
         Tfin = int(0.05 * len(self.ts))
-        print(Tfin)
+    
         if self.organ == 'brain':
             phases=self.compute_phases(self.vs.T) 
             
@@ -306,17 +306,27 @@ class FHN_coherence:
             self.coherence=self.calculate_coherence(v_values[:, self.transient_time:], window_size, step_size)
         if self.organ == 'heart':
             N_x=self.N
-            block=~self.block[4:(N_x-4), 4:(N_x-4)]  
-            v_values=v_values.reshape(N_x, N_x, -1)
-            v_values=v_values[4:(N_x-4), 4:(N_x-4), :]
+            if N_x>8:
+                block=~self.block[4:(N_x-4), 4:(N_x-4)]  
+                v_values=v_values.reshape(N_x, N_x, -1)
+                v_values=v_values[4:(N_x-4), 4:(N_x-4), :]
 
             
-            #TODO: implement this in JAX. I tried several times and failed
-            R=[]
-            for j in range(N_x-8):  # Iterate over the correct dimension
-                filtered_column = v_values[:, j, self.transient_time:][block[:,j]]
-                R.append(self.calculate_coherence(filtered_column, 500))
+                #TODO: implement this in JAX. I tried several times and failed
+                R=[]
+                for j in range(N_x-8):  # Iterate over the correct dimension
+                    filtered_column = v_values[:, j, self.transient_time:][block[:,j]]
+                    R.append(self.calculate_coherence(filtered_column, 500))
 
+                
+            else:
+                warnings.warn("Too few nodes to address boundary conditions")   
+                block=~self.block
+                v_values=v_values.reshape(N_x, N_x, -1)
+                R=[]
+                for j in range(N_x):
+                    filtered_column = v_values[:, j, self.transient_time:][block[:,j]]      
+                    R.append(self.calculate_coherence(filtered_column, 500))
             R=jnp.array(R)
             self.coherence=jnp.mean(R)
             
