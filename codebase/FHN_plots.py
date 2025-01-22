@@ -4,19 +4,19 @@ import matplotlib as mpl
 
 import numpy as np
 import scipy.sparse
+from scipy.sparse import csr_matrix
 
-mpl.rcParams["axes.spines.right"] = False
-mpl.rcParams["axes.spines.top"] = False
 projectfolder = "../figures/"
 simulation_name = "default"
 mpl.rcParams.update({"font.size": 16})
+
 
 
 def plot_graph_on_circle(
     y,
     J,
     ax,
-    subset_size="all",
+    subset_size=50,
     format_axes=True,
     plot_connections=True,
     arrows=True,
@@ -33,11 +33,9 @@ def plot_graph_on_circle(
         y (numpy.ndarray): (N) states of the neurons
         subset_size: number of nodes to plot, if 'all' then subset_size=N
     """
-    # Convert sparse matrix to dense format
-    if type(J) == scipy.sparse._csr.csr_array:
-        J_dense = J.todense()
-    else:
-        J_dense = J
+    J_dense = J.todense()
+    #else:
+   
     N = len(y)
 
     # Select a subset of nodes to plot
@@ -88,21 +86,29 @@ def plot_graph_on_circle(
                     color=color,
                     alpha=0.1,
                 )
-
-    # Plot the nodes on top of the connections
-    colors = np.where(np.array(y, dtype=bool), "royalblue", "white")
+    # Add a colorbar with specific ticks
+    subset_y = y[subset_indices]
+    
+    norm = plt.Normalize(vmin=-np.max(np.abs(subset_y)), vmax=np.max(np.abs(subset_y)))
+    cmap = plt.get_cmap("seismic")
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax, orientation='vertical', shrink=0.8)
+    cbar.set_label('V', rotation=0, labelpad=15, fontsize=16, color='black')
+    cbar.set_ticks([-1, -0.5, 0, 0.5, 1])
+    cbar.ax.tick_params(labelsize=14)
+    colors = cmap(norm(subset_y))
     ax.scatter(
         positions[:, 0], positions[:, 1], c=colors, edgecolors="black", s=marker_size
     )
-
 
 def plot_kymograph(
     fig,
     ax,
     model,
-    range="full",
-    cmap="PuBu",
-    xlabel="ts",
+    t_start=100,
+    cmap="seismic",
+    xlabel="time (a.u.)",
     ylabel="Node",
     cbar_axes=None,
     cbar_shrink=0.6,
@@ -110,16 +116,19 @@ def plot_kymograph(
     cbar_orientation="horizontal",
 ):
     # Plot the Kymograph
-    im = ax.imshow(
-        model.ys[range, ::-1].T,
-        extent=(np.min(model.ts[range]), np.max(model.ts[range]), 0, model.N),
+    im=ax.imshow(
+        model.vs[t_start:, ::-1].T,
+        extent=(np.min(model.ts[t_start:]), np.max(model.ts[t_start:]), 0, model.N),
         aspect="auto",
         cmap=cmap,
         interpolation="none",
+        vmin=-np.max(np.abs(model.vs)),
+        vmax=np.max(np.abs(model.vs))
     )
     ax.set_ylabel(ylabel)
     ax.set_xlabel(xlabel)
-
+    ax.xaxis.set_major_locator(plt.MaxNLocator(5))
+    ax.yaxis.set_major_locator(plt.MaxNLocator(5))
     # plot colorbar
     if type(cbar_axes) == type(None):
         cbar_axes = ax
@@ -130,5 +139,41 @@ def plot_kymograph(
         shrink=cbar_shrink,
         orientation=cbar_orientation,
     )
-
+    plt.show()
     return im, cbar
+
+def heart_plot(
+        fig,
+        ax,
+        model,
+        t_frame=100,
+        cbar_axes=None,
+        cbar_shrink=0.6,
+        cbar_location="right",
+        cbar_orientation="vertical",
+        cmap='seismic'
+
+  ):
+
+
+    array=model.vs.T
+# Display the first frame
+    array=array.reshape(model.N,model.N,-1)
+    img = ax.imshow(array[:,:, t_frame], cmap=cmap, interpolation="bilinear", vmin=-np.max(np.abs(array)), vmax=np.max(np.abs(array)))
+	
+    
+# Add a colorbar with specific ticks
+    if type(cbar_axes) == type(None):
+        cbar_axes = ax
+    cbar = fig.colorbar(
+        img,
+        ax=cbar_axes,
+        location=cbar_location,
+        shrink=cbar_shrink,
+        orientation=cbar_orientation,
+    )
+    ax.set_aspect('auto')
+    cbar.set_label('V', rotation=0, labelpad=15, fontsize=12, color='black')
+    ax.set_xticks([])  # Remove x-axis ticks
+    ax.set_yticks([])  
+    plt.show()

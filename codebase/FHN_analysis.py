@@ -3,6 +3,7 @@
 from .FHN_model import *
 import numpy as np
 from scipy.signal import hilbert
+import warnings
 
 class FHN_kuramoto:
     def __init__(self, model=None, vs=None, ws=None, ts=None):
@@ -64,13 +65,17 @@ class FHN_kuramoto:
         """
         Function that calculates Kuramoto distinguishing between the two organs TODO : find a smart way to exclude transient/last timesteps and cleaner heart code 
         """
+        Tfin = int(0.05 * len(self.ts))
+        print(Tfin)
         if self.organ == 'brain':
-            phases=self.compute_phases(self.vs.T)  #check that I actually need the transpose
-            amplitude, phase = self.kuramoto_order_parameter(phases[:,self.transient_time:Tfin]) #here I somehow need to remove the transient and last timesteps
+            phases=self.compute_phases(self.vs.T) 
+            
+            amplitude, phase = self.kuramoto_order_parameter(phases[:, self.transient_time:Tfin]) #here I somehow need to remove the transient and last timesteps
             self.R= jnp.mean(amplitude)
         if self.organ == 'heart':
             v_values= self.vs.T
-            N_x=jnp.sqrt(self.N)
+            N_x=self.N
+
             block= self.block
             block=block.reshape(N_x, N_x)
             if N_x>8:
@@ -94,6 +99,7 @@ class FHN_kuramoto:
  
                 self.R= jnp.mean(R)
             else:
+                warnings.warn("Too few nodes to address boundary conditions")   
                 block=~block
                 phases=self.compute_phases(v_values)
                 phases=phases[:,self.transient_time:Tfin]  #here to be changes to cover from equilibration to a bunch of stuff before end
@@ -189,7 +195,7 @@ class FHN_entropy:
             entropy, normalised=self.pattern_entropy(binary_v,s, 1)
         return entropy, normalised
     
-    def entropy_calculation(self, frame_size=9):
+    def entropy(self, frame_size=9):
         """
         Splits the input array into smaller sequences of size (frame_size, T)
         and calculates the entropy for each sequence using the entropycalc function.
@@ -216,7 +222,7 @@ class FHN_entropy:
             entropies, normalized_entropies = vmap(calculate_entropy_for_frame)(indices)
             self.entropy=jnp.mean(normalized_entropies)
         if self.organ == 'heart':
-            N_x=jnp.sqrt(self.N)
+            N_x=self.N
             array=self.vs.T 
             frame_size=3
             # TODO : add option to remove boundary sites
@@ -297,10 +303,10 @@ class FHN_coherence:
 
         v_values=self.vs.T
         if self.organ == 'brain':
-            self.R_V=self.calculate_coherence(v_values[:, self.transient_time:], window_size, step_size)
+            self.coherence=self.calculate_coherence(v_values[:, self.transient_time:], window_size, step_size)
         if self.organ == 'heart':
-            N_x=jnp.sqrt(self.N)
-            block=~block[4:(N_x-4), 4:(N_x-4)]  
+            N_x=self.N
+            block=~self.block[4:(N_x-4), 4:(N_x-4)]  
             v_values=v_values.reshape(N_x, N_x, -1)
             v_values=v_values[4:(N_x-4), 4:(N_x-4), :]
 
@@ -312,7 +318,7 @@ class FHN_coherence:
                 R.append(self.calculate_coherence(filtered_column, 500))
 
             R=jnp.array(R)
-            self.R_V=jnp.mean(R)
+            self.coherence=jnp.mean(R)
             
 
 

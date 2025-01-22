@@ -241,7 +241,7 @@ class FHN_model:
     def FHN_graph_noise(self):
         noise = self.noise_amp*jnp.ones(self.N)
         return noise
-       def solve_with_EulerMaruyama_fori(self, delta_t=0.1, T=3000.0, output_times=3000, random_key=jr.PRNGKey(0)): 
+    def solve_with_EulerMaruyama_fori(self, delta_t=0.1, T=3000.0, output_times=3000, random_key=jr.PRNGKey(0)): 
               
         # Calculate the number of solver steps based on the total time and delta_t
         num_steps = int(T / delta_t)
@@ -252,7 +252,7 @@ class FHN_model:
         # Heart-specific preparations 
         if self.organ=='heart':
             # meaning of N changes
-            Ntot = self.N*self.N
+            Ntot= self.N*self.N
             # note indices fibrotic conduction blocks, needed for stimulus
             indices = jnp.where((jnp.arange(Ntot) % self.N == 0) & (self.block.flatten() == 0))[0]
                 
