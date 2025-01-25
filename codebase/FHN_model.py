@@ -15,20 +15,20 @@ class FHN_model:
                 a='organ_default', 
                 b='organ_default', 
                 e='organ_default', 
-                noise_amp='organ_default', 
-                Du='organ_default', 
+                sigma='organ_default', 
+                Dv='organ_default', 
                 v0='zeros', 
                 w0='zeros',
                 m='organ_default',
                 p='organ_default',
                 k='organ_default',
                 random_key=jr.PRNGKey(1000), 
-                v0_noise_amp=None, 
-                w0_noise_amp=None,
-                Laplacian_seed=1000,
+                v0_sigma=None, 
+                w0_sigma=None,
+                adjacency_seed=1000,
                 stimulus_time=1000):
         ## Model parameters
-        # TODO atm here I pass only the parameters we use in the simulations. For educational purposes we should change it
+        # TODO atm here I pass only the parameters we use in the simulations. For eDvcational purposes we should change it
         if type(organ)==str and organ == 'brain':
             if type(N)==str and N == 'organ_default':
                 N = 1000
@@ -38,13 +38,13 @@ class FHN_model:
                 b = 0.2
             if type(e)==str and e == 'organ_default':
                 e = 0.01
-            if type(noise_amp)==str and noise_amp == 'organ_default':
-                noise_amp = 0.1
-            if type(Du)==str and Du == 'organ_default':
-                Du = 1
-            elif Du != 1:
-                print('A Du value other than 1 is not allowed for a brain simulation as the parameter is absorbed in m. Du will be set to 1 instead.')
-                Du = 1
+            if type(sigma)==str and sigma == 'organ_default':
+                sigma = 0.1
+            if type(Dv)==str and Dv == 'organ_default':
+                Dv = 1
+            elif Dv != 1:
+                print('A Dv value other than 1 is not allowed for a brain simulation as the parameter is absorbed in m. Dv will be set to 1 instead.')
+                Dv = 1
             if type(m)==str and m == 'organ_default':
                 m = 0.005
             if type(p)==str and p == 'organ_default':
@@ -54,17 +54,17 @@ class FHN_model:
 
         elif type(organ)==str and organ == 'heart':
             if type(N)==str and N == 'organ_default':
-                N = 200
+                N = 100
             if type(a)==str and a == 'organ_default':
                 a = 3
             if type(b)==str and b == 'organ_default':
                 b = 0.05
             if type(e)==str and e == 'organ_default':
                 e = 0.01
-            if type(noise_amp)==str and noise_amp == 'organ_default':
-                noise_amp = 0.0001
-            if type(Du)==str and Du == 'organ_default':
-                Du = -0.04
+            if type(sigma)==str and sigma == 'organ_default':
+                sigma = 0.0001
+            if type(Dv)==str and Dv == 'organ_default':
+                Dv = -0.04
             if type(m)==str and m == 'organ_default':
                 m = 0.005  # has no influence
             if type(p)==str and p == 'organ_default':
@@ -76,15 +76,15 @@ class FHN_model:
 
         # Save model parameters
         self.organ=organ
-        self.Laplacian_seed=Laplacian_seed
+        self.adjacency_seed=adjacency_seed
         self.stimulus_time=stimulus_time
 
         self.N = N
         self.a = a
         self.b = b
         self.e = e
-        self.noise_amp = noise_amp
-        self.Du=Du
+        self.sigma = sigma
+        self.Dv=Dv
         self.m=m
         self.p=p
         self.k=k
@@ -92,7 +92,7 @@ class FHN_model:
         ## Initiate the coupling matrix and initial conditions
         if type(organ)==str and organ == 'brain':
             # Coupling matrix
-            self.initiate_random_graph(seed=Laplacian_seed)
+            self.initiate_random_graph(seed=adjacency_seed)
             self.block = None # Blocked, fibrotic cells only exist in heart simulations
 
             # Initial conditions
@@ -102,13 +102,13 @@ class FHN_model:
                 w0 = jnp.zeros(N)
         
             if type(v0) == str and v0=='random':
-                v0 = jax.random.normal(random_key, shape=(2*N,))*v0_noise_amp
+                v0 = jax.random.normal(random_key, shape=(2*N,))*v0_sigma
             if type(w0) == str and w0=='random':
-                v0 = jax.random.normal(random_key, shape=(2*N,))*w0_noise_amp
+                v0 = jax.random.normal(random_key, shape=(2*N,))*w0_sigma
         
         elif type(organ)==str and organ == 'heart':
             # Coupling matrix
-            self.generate_laplacian(seed=Laplacian_seed)
+            self.generate_laplacian(seed=adjacency_seed)
 
             # Initial conditions
             indices = jnp.where((jnp.arange(N*N) % N == 0) & (self.block.flatten() == 0))[0]
@@ -147,6 +147,7 @@ class FHN_model:
         p = self.k / (self.N - 1)
         J=self.m/self.k
         # Create ER graph
+        seed=self.adjacency_seed
         G = nx.erdos_renyi_graph(self.N, p, directed=True, seed=seed)
         
         # Put weights
@@ -156,7 +157,7 @@ class FHN_model:
         # Get the adjacency matrix in sparse format
         adj_matrix = nx.adjacency_matrix(G, weight='weight')
         
-        self.L = sparse.BCSR.from_scipy_sparse(adj_matrix)
+        self.J = sparse.BCSR.from_scipy_sparse(adj_matrix)
     
     #Laplacian generation for the heart
     def generate_laplacian(self, sparse_matrix=True, seed=101):
@@ -165,8 +166,8 @@ class FHN_model:
         adj_rows = []
         adj_cols = []
         adj_data = []
-
-        # Generate random conduction blocks
+        seed= self.adjacency_seed
+        # Generate random conDvction blocks
         np.random.seed(seed)
         conduction_blocks = np.random.rand(self.N, self.N) < self.p
 
@@ -186,7 +187,7 @@ class FHN_model:
             (1, 1, .25)      # bottom-right
         ]
     
-        # Build adjacency structure excluding conduction blocks
+        # Build adjacency structure excluding conDvction blocks
         indices = np.array([[i, j] for i in range(self.N) for j in range(self.N)])
         idx = node_index(indices[:, 0], indices[:, 1])
 
@@ -202,7 +203,7 @@ class FHN_model:
             ni_valid = ni[valid_indices]
             nj_valid = nj[valid_indices]
 
-        # Step 3: Apply conduction block exclusion on the filtered indices
+        # Step 3: Apply conDvction block exclusion on the filtered indices
             valid_conduction = ~conduction_blocks[ni_valid, nj_valid]
             valid_node = ~conduction_blocks[indices[valid_indices, 0], indices[valid_indices, 1]]
             valid = valid_conduction & valid_node
@@ -223,25 +224,25 @@ class FHN_model:
 
         if sparse_matrix:
 
-            self.L= sparse.BCSR.from_scipy_sparse(laplacian_matrix)
+            self.J= sparse.BCSR.from_scipy_sparse(laplacian_matrix)
             self.block= jnp.array(conduction_blocks)
     
         else:
-            self.L= laplacian_matrix.todense()
+            self.J= laplacian_matrix.todense()
             self.block= conduction_blocks
 
     # Deterministic part of the differential equation
     def FHN_graph(self, v, w):
-        dv = self.a*v*(v-self.b)*(1-v) + self.Du*(self.L @ v) - w 
+        dv = self.a*v*(v-self.b)*(1-v) + self.Dv*(self.J @ v) - w 
         dw = self.e*(v-w)
 
         return (dv,dw)
     
     # Stochastic part of the differential equation
     def FHN_graph_noise(self):
-        noise = self.noise_amp*jnp.ones(self.N)
+        noise = self.sigma*jnp.ones(self.N)
         return noise
-    def solve_with_EulerMaruyama_fori(self, delta_t=0.1, T=3000.0, output_times=3000, random_key=jr.PRNGKey(0)): 
+    def solve_with_EulerMaruyama_fori(self, delta_t=0.1, T=3000.0, output_times=3000, random_key=jr.PRNGKey(1000)): 
               
         # Calculate the number of solver steps based on the total time and delta_t
         num_steps = int(T / delta_t)
@@ -253,7 +254,7 @@ class FHN_model:
         if self.organ=='heart':
             # meaning of N changes
             Ntot= self.N*self.N
-            # note indices fibrotic conduction blocks, needed for stimulus
+            # note indices fibrotic conDvction blocks, needed for stimulus
             indices = jnp.where((jnp.arange(Ntot) % self.N == 0) & (self.block.flatten() == 0))[0]
                 
         # Initialize output arrays
@@ -267,7 +268,7 @@ class FHN_model:
 
             # Update variables
             deterministic_update = self.FHN_graph(v, w)
-            noise_update = jr.normal(subkey, v.shape) * self.noise_amp
+            noise_update = jr.normal(subkey, v.shape) * self.sigma
             v = v + deterministic_update[0]*delta_t +  jnp.sqrt(delta_t) * noise_update
             w = w + deterministic_update[1]*delta_t
 
