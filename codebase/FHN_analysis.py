@@ -6,7 +6,7 @@ from scipy.signal import hilbert
 import warnings
 
 class FHN_kuramoto:
-    def __init__(self, model=None, vs=None, ws=None, ts=None):
+    def __init__(self, model=None, vs=None, ws=None, ts=None, transient_time=100):
         if model is not None:
             self.ts = model.ts
             self.vs = model.vs
@@ -14,12 +14,13 @@ class FHN_kuramoto:
             self.N = model.N
             self.block = model.block
             self.organ = model.organ
-            self.transient_time=100
+            self.transient_time=transient_time
         elif vs is not None and ws is not None:
             self.vs = vs
             self.ws = ws
             self.ts = ts
             self.N = vs.shape[1]
+            self.transient_time=transient_time
         else:
             raise ValueError("Either model or vs and ws must be provided")
 
@@ -65,7 +66,7 @@ class FHN_kuramoto:
         """
         Function that calculates Kuramoto distinguishing between the two organs TODO : find a smart way to exclude transient/last timesteps and cleaner heart code 
         """
-        Tfin = int(0.05 * len(self.ts))
+        Tfin = int(0.95 * len(self.ts))
     
         if self.organ == 'brain':
             phases=self.compute_phases(self.vs.T) 
@@ -121,7 +122,7 @@ class FHN_kuramoto:
 
 
 class FHN_entropy:
-    def __init__(self, model=None, vs=None, ws=None, ts=None):
+    def __init__(self, model=None, vs=None, ws=None, ts=None, transient_time=100):
         if model is not None:
             self.ts = model.ts
             self.vs = model.vs
@@ -129,12 +130,13 @@ class FHN_entropy:
             self.N = model.N
             self.block = model.block
             self.organ = model.organ
-            self.transient_time=100
+            self.transient_time=transient_time
         elif vs is not None and ws is not None:
             self.vs = vs
             self.ws = ws
             self.ts = ts
             self.N = vs.shape[1]
+            self.transient_time=transient_time
         else:
             raise ValueError("Either model or vs and ws must be provided")
 
@@ -241,7 +243,7 @@ class FHN_entropy:
 
 
 class FHN_coherence:
-    def __init__(self, model=None, vs=None, ws=None, ts=None):
+    def __init__(self, model=None, vs=None, ws=None, ts=None, transient_time=100):
         if model is not None:
             self.ts = model.ts
             self.vs = model.vs
@@ -249,12 +251,13 @@ class FHN_coherence:
             self.N = model.N
             self.block = model.block
             self.organ = model.organ
-            self.transient_time=100
+            self.transient_time=transient_time
         elif vs is not None and ws is not None:
             self.vs = vs
             self.ws = ws
             self.ts = ts
             self.N = vs.shape[1]
+            self.transient_time=transient_time
         else:
             raise ValueError("Either model or vs and ws must be provided")
 
