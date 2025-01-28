@@ -11,7 +11,7 @@ figures/
 .DS_Store
 
 # data files
-data/
+*/data/
 simulation_data/
 data_backup
 
