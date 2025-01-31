@@ -118,7 +118,7 @@ def FHN_step(u, v, N, a, b, e, Du, sigma, L, key, delta_t):
 
     return u_new, v_new
 
-def run_simulation_with_splits(N,  a=3, b=0.05, e=1e-2, Du=0.04, L=None, indices=None, sigma=0.0001, stimulus_time=2000, delta_t=0.1, T=40000.0, output_times=20000, random_key=random.PRNGKey(0), split_t=10):
+def run_simulation_with_splits(N,  a=3, b=0.05, e=1e-2, Du=0.04, L=None, indices=None, sigma=0.0001, stimulus_time=2000, delta_t=0.1, T=8000.0, output_times=4000, random_key=random.PRNGKey(0), split_t=2):
     # Calculate the number of solver steps based on the total time and delta_t
     num_steps = int(T / delta_t)
     output_every = int(max(num_steps / output_times, 1))
@@ -132,7 +132,7 @@ def run_simulation_with_splits(N,  a=3, b=0.05, e=1e-2, Du=0.04, L=None, indices
 
     # Initialize output arrays
     vs = jnp.empty((int(output_times / num_splits), N), dtype=jnp.float32)
-
+    print(vs.size)
     # Define the scan function
     @jit
     def scan_fn(step, carry):
@@ -158,11 +158,11 @@ def run_simulation_with_splits(N,  a=3, b=0.05, e=1e-2, Du=0.04, L=None, indices
 
         # Run the scan function for the current split
         u0, v0, key0, vs = lax.fori_loop(0, steps_per_split, scan_fn, (u0, v0, key0, vs))
-
+        print(f"Split: {split}, Memory usage of vs: {vs.nbytes / 1024**2:.2f} MB")
         u0 = u0.at[indices].add(0.1)
         
         if split >= split_t:
-            print(vs.shape)
+        
             with open(output_file, 'ab') as f:
                 pickle.dump(vs, f)
 
@@ -174,4 +174,5 @@ def run_simulation_with_splits(N,  a=3, b=0.05, e=1e-2, Du=0.04, L=None, indices
 
 L1, c1 = generate_laplacian(N_x,N_y, block,sparse_matrix=True, seed=seed)
 indices = jnp.where((jnp.arange(N) % N_x == 0) & (c1.flatten() == 0))[0]
-run_simulation_with_splits(N, L=L1, indices=indices, random_key=random.PRNGKey(seed), split_t=10)
+
+run_simulation_with_splits(N, L=L1, indices=indices, random_key=random.PRNGKey(seed), split_t=2)
