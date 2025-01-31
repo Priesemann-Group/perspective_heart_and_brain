@@ -118,7 +118,7 @@ def FHN_step(u, v, N, a, b, e, Du, sigma, L, key, delta_t):
 
     return u_new, v_new
 
-def run_simulation_with_splits(N,  a=3, b=0.05, e=1e-2, Du=0.04, L=None, indices=None, sigma=0.0001, stimulus_time=1000, delta_t=0.1, T=4000.0, output_times=1333, random_key=random.PRNGKey(0), split_t=2):
+def run_simulation_with_splits(N,  a=3, b=0.05, e=1e-2, Du=0.04, L=None, indices=None, sigma=0.0001, stimulus_time=2000, delta_t=0.1, T=40000.0, output_times=20000, random_key=random.PRNGKey(0), split_t=10):
     # Calculate the number of solver steps based on the total time and delta_t
     num_steps = int(T / delta_t)
     output_every = int(max(num_steps / output_times, 1))
@@ -174,4 +174,4 @@ def run_simulation_with_splits(N,  a=3, b=0.05, e=1e-2, Du=0.04, L=None, indices
 
 L1, c1 = generate_laplacian(N_x,N_y, block,sparse_matrix=True, seed=seed)
 indices = jnp.where((jnp.arange(N) % N_x == 0) & (c1.flatten() == 0))[0]
-run_simulation_with_splits(N, L=L1, indices=indices, random_key=random.PRNGKey(seed), split_t=2)
+run_simulation_with_splits(N, L=L1, indices=indices, random_key=random.PRNGKey(seed), split_t=10)
