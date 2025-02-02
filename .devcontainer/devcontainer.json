@@ -1,5 +1,5 @@
 {
-  "name": "Python Dev Container with Poetry",
+  "name": "Python Dev Container with Poetry & Jupyter",
   "image": "mcr.microsoft.com/devcontainers/python:3.10",
   "features": {
     "ghcr.io/devcontainers/features/python:1": {
@@ -10,9 +10,11 @@
     "vscode": {
       "extensions": [
         "ms-python.python",
-        "ms-python.vscode-pylance"
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter"
       ]
     }
   },
-  "postCreateCommand": "pip install poetry && poetry install"
+  "postCreateCommand": "pip install poetry && poetry install && poetry run python -m ipykernel install --user --name=heart_and_brain",
+  "remoteUser": "vscode"
 }
