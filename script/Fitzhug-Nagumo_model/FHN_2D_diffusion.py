@@ -106,19 +106,19 @@ def generate_laplacian(N, M, conduction_block_threshold, sparse_matrix=False, se
         return laplacian_matrix.todense(), conduction_blocks
 
 
-def FHN_step(u, v, N, a, b, e, Du, sigma, L, key, delta_t):
+def FHN_step(v, w, N, a, b, e, Dv, sigma, L, key, delta_t):
 
     # Generate Gaussian noise for each element of h
-    noise = random.normal(key, u.shape)
+    noise = random.normal(key, v.shape)
     
-    du = a * u * (u - b) * (1 - u) - Du * (L @ u) - v 
-    dv = e * (u - v)
-    u_new = u + du * delta_t + jnp.sqrt(delta_t * sigma**2) * noise
-    v_new = v + dv * delta_t
+    dv = a * v * (v - b) * (1 -v) - Dv * (L @ v) - w 
+    dw = e * (v - w)
+    v_new = v + dv * delta_t + jnp.sqrt(delta_t * sigma**2) * noise
+    w_new = w + dw * delta_t
 
-    return u_new, v_new
+    return v_new, w_new
 
-def run_simulation_with_splits(N,  a=3, b=0.05, e=1e-2, Du=0.04, L=None, indices=None, sigma=0.0001, stimulus_time=2000, delta_t=0.1, T=40000.0, output_times=20000, random_key=random.PRNGKey(0), split_t=10):
+def run_simulation_with_splits(N,  a=3, b=0.05, e=1e-2, Dv=0.04, L=None, indices=None, sigma=0.0001, stimulus_time=2000, delta_t=0.1, T=8000.0, output_times=4000, random_key=random.PRNGKey(0), split_t=2):
     # Calculate the number of solver steps based on the total time and delta_t
     num_steps = int(T / delta_t)
     output_every = int(max(num_steps / output_times, 1))
@@ -126,30 +126,30 @@ def run_simulation_with_splits(N,  a=3, b=0.05, e=1e-2, Du=0.04, L=None, indices
     num_splits= int(T/stimulus_time)
  
 
-    u0 = jnp.zeros(N, dtype=jnp.float32)
     v0 = jnp.zeros(N, dtype=jnp.float32)
-    u0 = u0.at[indices].set(0.1)
+    w0 = jnp.zeros(N, dtype=jnp.float32)
+    v0 = v0.at[indices].set(0.1)
 
     # Initialize output arrays
     vs = jnp.empty((int(output_times / num_splits), N), dtype=jnp.float32)
-
+    
     # Define the scan function
     @jit
     def scan_fn(step, carry):
-        u, v, key, vs = carry
+        v, w, key, vs = carry
         key, subkey = random.split(key)
         # Update variables
-        u, v = FHN_step(u, v, N, a, b, e, Du, sigma, L, subkey, delta_t)
+        v, w = FHN_step(v, w, N, a, b, e, Dv, sigma, L, subkey, delta_t)
 
         # Store output if at the correct interval
         vs = lax.cond(
             step % output_every == 0,
-            lambda vs: vs.at[step // output_every, :].set(u),
+            lambda vs: vs.at[step // output_every, :].set(v),
             lambda vs: vs,
             vs
         )
 
-        return (u, v, key, vs)
+        return (v, w, key, vs)
 
     # Run the simulation in splits
     output_file = f'V_values_p={block}_seed={seed}.pkl'
@@ -157,12 +157,12 @@ def run_simulation_with_splits(N,  a=3, b=0.05, e=1e-2, Du=0.04, L=None, indices
     for split in range(num_splits):
 
         # Run the scan function for the current split
-        u0, v0, key0, vs = lax.fori_loop(0, steps_per_split, scan_fn, (u0, v0, key0, vs))
-
-        u0 = u0.at[indices].add(0.1)
+        v0, w0, key0, vs = lax.fori_loop(0, steps_per_split, scan_fn, (v0, w0, key0, vs))
+        print(f"Split: {split}, Memory usage of vs: {vs.nbytes / 1024**2:.2f} MB")
+        v0 = v0.at[indices].add(0.1)
         
         if split >= split_t:
-            print(vs.shape)
+        
             with open(output_file, 'ab') as f:
                 pickle.dump(vs, f)
 
@@ -174,4 +174,5 @@ def run_simulation_with_splits(N,  a=3, b=0.05, e=1e-2, Du=0.04, L=None, indices
 
 L1, c1 = generate_laplacian(N_x,N_y, block,sparse_matrix=True, seed=seed)
 indices = jnp.where((jnp.arange(N) % N_x == 0) & (c1.flatten() == 0))[0]
-run_simulation_with_splits(N, L=L1, indices=indices, random_key=random.PRNGKey(seed), split_t=10)
+
+run_simulation_with_splits(N, L=L1, indices=indices, random_key=random.PRNGKey(seed), split_t=2)
