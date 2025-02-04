@@ -1,7 +1,5 @@
 import numpy as np 
 
-
-
 import pickle
 import os, sys
 import gc
@@ -17,6 +15,13 @@ from jax import lax, vmap, jit
 import jax.random as random
 from jax.experimental import sparse
 import argparse
+
+import psutil
+
+def log_memory_usage():
+    process = psutil.Process()
+    mem_info = process.memory_info()
+    print(f"RSS: {mem_info.rss / 1024**2:.2f} MB, VMS: {mem_info.vms / 1024**2:.2f} MB")
 
 parser = argparse.ArgumentParser(description='Run simulation with specified seed and block.')
 parser.add_argument('--seed', type=int, required=True, help='Random seed for simulation.')
@@ -158,9 +163,9 @@ def run_simulation_with_splits(N,  a=3, b=0.05, e=1e-2, Dv=0.04, L=None, indices
 
         # Run the scan function for the current split
         v0, w0, key0, vs = lax.fori_loop(0, steps_per_split, scan_fn, (v0, w0, key0, vs))
-        print(f"Split: {split}, Memory usage of vs: {vs.nbytes / 1024**2:.2f} MB")
+        #print(f"Split: {split}, Memory usage of vs: {vs.nbytes / 1024**2:.2f} MB")
         v0 = v0.at[indices].add(0.1)
-        
+        log_memory_usage()  # Print memory usage at each split
         if split >= split_t:
         
             with open(output_file, 'ab') as f:
