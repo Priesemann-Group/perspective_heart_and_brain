@@ -22,3 +22,8 @@ networkx = "^3.3"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry2conda]
+name = "heart_and_brain"  
+channels = ["conda-forge", "defaults"]
+
