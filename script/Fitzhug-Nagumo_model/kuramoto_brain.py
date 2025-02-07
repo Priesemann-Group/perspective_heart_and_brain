@@ -50,7 +50,7 @@ def read_simulation_data(file_path):
         return None
 
 # Example usage
-output_file = f'V_values_p={block}_seed={seed}.pkl'
+output_file = f'/scratch01.local/ipellini/V_values_brain/V_values_m={block}_seed={seed}.pkl'
 simulation_data = read_simulation_data(output_file)
 simulation_data = simulation_data.T
 if simulation_data is not None:
@@ -95,10 +95,27 @@ def kuramoto_order_parameter(phases):
    
     #phase = jnp.angle(order_parameter_complex)
     return amplitude
+output_file = f'/scratch01.local/ipellini/Kuramoto_brain.pkl'
 
-output_file = f'Kuramoto_brain.pkl'
+# Convert R to a float
+
 simulation_data=compute_phases(simulation_data)
-R=kuramoto_order_parameter(simulation_data)
 
+R=kuramoto_order_parameter(simulation_data)
+R = float(R)
+# Prepare the data to be dumped
+data_to_dump = {
+    'seed': seed,
+    'block': block,
+    'R': R
+}
+
+# Write the header if the file does not exist
+if not os.path.exists(output_file):
+    with open(output_file, 'wb') as f:
+        pickle.dump(['seed', 'm', 'R'], f)
+
+# Append the data to the file
 with open(output_file, 'ab') as f:
-    pickle.dump(R, f)
+    pickle.dump(data_to_dump, f)
+

@@ -148,7 +148,18 @@ c1=generate_laplacian(200, 200, block, seed)
 R=tot_kuramoto_heart(simulation_data, c1, 200, 200)
 
 output_file = f'Kuramoto_heart.pkl'
+data_to_dump = {
+    'seed': seed,
+    'block': block,
+    'R': R
+}
 
-print(R)
+# Write the header if the file does not exist
+if not os.path.exists(output_file):
+    with open(output_file, 'wb') as f:
+        pickle.dump(['seed', 'p', 'R'], f)
+
+# Append the data to the file
 with open(output_file, 'ab') as f:
-    pickle.dump(R, f)
+    pickle.dump(data_to_dump, f)
+
