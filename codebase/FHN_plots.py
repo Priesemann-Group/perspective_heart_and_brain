@@ -260,6 +260,6 @@ def plot_kymograph_and_collective_signal(
         cbar_orientation=cbar_orientation,
     )
     # Plot the collective signal
-    collective_signal(fig, ax_signal, model)
+    collective_signal(fig, ax_signal, model, t_start=t_start)
     
     return im, cbar

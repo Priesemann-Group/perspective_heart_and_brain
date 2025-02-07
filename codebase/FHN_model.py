@@ -26,7 +26,7 @@ class FHN_model:
                 v0_sigma=None, 
                 w0_sigma=None,
                 adjacency_seed=1000,
-                stimulus_time=1000):
+                stimulus_time=2000):
         ## Model parameters
         # TODO atm here I pass only the parameters we use in the simulations. For eDvcational purposes we should change it
         if type(organ)==str and organ == 'brain':
@@ -50,7 +50,7 @@ class FHN_model:
             if type(p)==str and p == 'organ_default':
                 p = 0    # has no influence
             if type(k)==str and k == 'organ_default':
-                k = 50   # has no influence
+                k = 8   # has no influence
 
         elif type(organ)==str and organ == 'heart':
             if type(N)==str and N == 'organ_default':
