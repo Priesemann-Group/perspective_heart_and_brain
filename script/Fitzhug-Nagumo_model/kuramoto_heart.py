@@ -15,12 +15,11 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Run simulation with specified seed and block.')
 parser.add_argument('--seed', type=int, required=True, help='Random seed for simulation.')
-parser.add_argument('--block', type=float, required=True, help='Conduction block threshold.')
 args = parser.parse_args()
 
 seed = args.seed
-block = args.block
-print(f"Seed: {seed}, Block: {block}")
+
+print(f"Seed: {seed}")
 
 def read_simulation_data(file_path):
     """
@@ -49,12 +48,6 @@ def read_simulation_data(file_path):
         print(f"An error occurred while reading the file: {e}")
         return None
 
-# Example usage
-output_file = f'V_values_p={block}_seed={seed}.pkl'
-simulation_data = read_simulation_data(output_file)
-simulation_data = simulation_data.T
-if simulation_data is not None:
-    print(simulation_data.shape)
 
 def compute_phases(data):
     """
@@ -143,23 +136,31 @@ def generate_laplacian(N, M, conduction_block_threshold, seed=0):
 
     return jnp.array(conduction_blocks)
 
-c1=generate_laplacian(200, 200, block, seed)
+for i in np.arange(0,1,0.01):
+    i=round(i,2)
+    c1=generate_laplacian(200, 200, i, seed)
+    output_file = f'/scratch01.local/ipellini/V_values_heart/V_values_p={i}_seed={seed}.pkl'
+    simulation_data = read_simulation_data(output_file)
+    simulation_data = simulation_data.T
+    if simulation_data is not None:
+        print(i, simulation_data.shape)
+    output_file = f'/scratch01.local/ipellini/Kuramoto/Kuramoto_heart_seed={seed}.pkl'
+    R=tot_kuramoto_heart(simulation_data, c1, 200, 200)
+    R=float(R)
+    # Prepare the data to be dumped
+    data_to_dump = {
+        'seed': seed,
+        'block': i,
+        'R': R
+    }
 
-R=tot_kuramoto_heart(simulation_data, c1, 200, 200)
+    # Write the header if the file does not exist
+    if not os.path.exists(output_file):
+        with open(output_file, 'wb') as f:
+            pickle.dump(['seed', 'p', 'R'], f)
 
-output_file = f'Kuramoto_heart.pkl'
-data_to_dump = {
-    'seed': seed,
-    'block': block,
-    'R': R
-}
+    # Append the data to the file
+    with open(output_file, 'ab') as f:
+        pickle.dump(data_to_dump, f)
 
-# Write the header if the file does not exist
-if not os.path.exists(output_file):
-    with open(output_file, 'wb') as f:
-        pickle.dump(['seed', 'p', 'R'], f)
-
-# Append the data to the file
-with open(output_file, 'ab') as f:
-    pickle.dump(data_to_dump, f)
 

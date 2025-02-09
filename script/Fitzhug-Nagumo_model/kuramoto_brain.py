@@ -15,12 +15,12 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Run simulation with specified seed and block.')
 parser.add_argument('--seed', type=int, required=True, help='Random seed for simulation.')
-parser.add_argument('--block', type=float, required=True, help='Conduction block threshold.')
+
 args = parser.parse_args()
 
 seed = args.seed
-block = args.block
-print(f"Seed: {seed}, Block: {block}")
+
+print(f"Seed: {seed}")
 
 def read_simulation_data(file_path):
     """
@@ -49,12 +49,6 @@ def read_simulation_data(file_path):
         print(f"An error occurred while reading the file: {e}")
         return None
 
-# Example usage
-output_file = f'/scratch01.local/ipellini/V_values_brain/V_values_m={block}_seed={seed}.pkl'
-simulation_data = read_simulation_data(output_file)
-simulation_data = simulation_data.T
-if simulation_data is not None:
-    print(simulation_data.shape)
 
 # Function to compute the phase of each element across time using the Hilbert transform
 
@@ -95,27 +89,31 @@ def kuramoto_order_parameter(phases):
    
     #phase = jnp.angle(order_parameter_complex)
     return amplitude
-output_file = f'/scratch01.local/ipellini/Kuramoto_brain.pkl'
 
-# Convert R to a float
+for i in np.arange(0,0.25,0.001):
+    i=round(i,3)
+    output_file = f'/scratch01.local/ipellini/V_values_brain/V_values_m={i}_seed={seed}.pkl'
+    simulation_data = read_simulation_data(output_file)
+    simulation_data = simulation_data.T
+    if simulation_data is not None:
+        print(i, simulation_data.shape)
+    output_file = f'/scratch01.local/ipellini/Kuramoto_brain_seed={seed}.pkl'
+    simulation_data=compute_phases(simulation_data)
+    R=kuramoto_order_parameter(simulation_data)
+    R=float(R)
+    # Prepare the data to be dumped
+    data_to_dump = {
+        'seed': seed,
+        'block': i,
+        'R': R
+    }
 
-simulation_data=compute_phases(simulation_data)
+    # Write the header if the file does not exist
+    if not os.path.exists(output_file):
+        with open(output_file, 'wb') as f:
+            pickle.dump(['seed', 'm', 'R'], f)
 
-R=kuramoto_order_parameter(simulation_data)
-R = float(R)
-# Prepare the data to be dumped
-data_to_dump = {
-    'seed': seed,
-    'block': block,
-    'R': R
-}
-
-# Write the header if the file does not exist
-if not os.path.exists(output_file):
-    with open(output_file, 'wb') as f:
-        pickle.dump(['seed', 'm', 'R'], f)
-
-# Append the data to the file
-with open(output_file, 'ab') as f:
-    pickle.dump(data_to_dump, f)
+    # Append the data to the file
+    with open(output_file, 'ab') as f:
+        pickle.dump(data_to_dump, f)
 
