@@ -92,12 +92,12 @@ def kuramoto_order_parameter(phases):
 
 for i in np.arange(0,0.25,0.001):
     i=round(i,3)
-    output_file = f'/scratch01.local/ipellini/V_values_brain/V_values_m={i}_seed={seed}.pkl'
+    output_file = f'V_values_m={i}_seed={seed}.pkl'
     simulation_data = read_simulation_data(output_file)
     simulation_data = simulation_data.T
     if simulation_data is not None:
         print(i, simulation_data.shape)
-    output_file = f'/scratch01.local/ipellini/Kuramoto_brain_seed={seed}.pkl'
+    output_file = f'Kuramoto_brain_seed={seed}.pkl'
     simulation_data=compute_phases(simulation_data)
     R=kuramoto_order_parameter(simulation_data)
     R=float(R)

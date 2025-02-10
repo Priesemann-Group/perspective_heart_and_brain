@@ -139,12 +139,12 @@ def generate_laplacian(N, M, conduction_block_threshold, seed=0):
 for i in np.arange(0,1,0.01):
     i=round(i,2)
     c1=generate_laplacian(200, 200, i, seed)
-    output_file = f'/scratch01.local/ipellini/V_values_heart/V_values_p={i}_seed={seed}.pkl'
+    output_file = f'V_values_p={i}_seed={seed}.pkl'
     simulation_data = read_simulation_data(output_file)
     simulation_data = simulation_data.T
     if simulation_data is not None:
         print(i, simulation_data.shape)
-    output_file = f'/scratch01.local/ipellini/Kuramoto/Kuramoto_heart_seed={seed}.pkl'
+    output_file = f'Kuramoto_heart_seed={seed}.pkl'
     R=tot_kuramoto_heart(simulation_data, c1, 200, 200)
     R=float(R)
     # Prepare the data to be dumped
