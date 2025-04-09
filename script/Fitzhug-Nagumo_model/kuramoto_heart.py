@@ -135,6 +135,7 @@ def generate_laplacian(N, M, conduction_block_threshold, seed=0):
     conduction_blocks = np.random.rand(N, M) < conduction_block_threshold
 
     return jnp.array(conduction_blocks)
+    
 
 for i in np.arange(0,1,0.01):
     i=round(i,2)

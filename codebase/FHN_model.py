@@ -35,11 +35,11 @@ class FHN_model:
             if type(a)==str and a == 'organ_default':
                 a = 3
             if type(b)==str and b == 'organ_default':
-                b = 0.2
+                b = 0.05
             if type(e)==str and e == 'organ_default':
                 e = 0.01
             if type(sigma)==str and sigma == 'organ_default':
-                sigma = 0.1
+                sigma = 0.008
             if type(Dv)==str and Dv == 'organ_default':
                 Dv = 1
             elif Dv != 1:
@@ -50,7 +50,7 @@ class FHN_model:
             if type(p)==str and p == 'organ_default':
                 p = 0    # has no influence
             if type(k)==str and k == 'organ_default':
-                k = 8   # has no influence
+                k = 8  
 
         elif type(organ)==str and organ == 'heart':
             if type(N)==str and N == 'organ_default':
