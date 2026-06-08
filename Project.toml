@@ -1,11 +1,13 @@
 [deps]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 CellMLToolkit = "03cb29e0-1ef4-4721-aa24-cf58a006576f"
+ChaosTools = "608a59af-f2a3-5ad4-90b4-758bdf3122a7"
 DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
 DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DynamicalSystems = "61744808-ddfa-5f27-97ff-6e42cc95d634"
 IntervalArithmetic = "d1acc4aa-44c8-5952-acd4-ba5d80a2a253"
+IntervalSets = "8197267c-284f-5f27-9208-e0e47529a953"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 LsqFit = "2fda8390-95c7-5789-9bda-21331edee243"
 MAT = "23992714-dd62-5051-b70f-ba57cb901cac"
